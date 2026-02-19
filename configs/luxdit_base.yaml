@@ -1,0 +1,59 @@
+output_dir: 'checkpoints/luxdit_base'
+
+pretrained_model_name_or_path: 'THUDM/CogVideoX-5b-I2V'
+revision: null
+
+model_pipeline:
+  unet_path: 'THUDM/CogVideoX-5b-I2V'
+  vae_path: 'THUDM/CogVideoX-5b-I2V'
+  image_encoder_path: 'THUDM/CogVideoX-5b-I2V' # 1024
+
+  cond_mode: 'env' # clipimage for cross attention
+  target_image: ['rgb']
+  additional_target_image: ['env_ldr', 'env_log']
+  additional_rope_time_only: false
+
+  separate_timesteps: true
+  denoise_type: 'additional_hidden_states'
+
+  text_prompt: null
+
+  cond_images:
+    rgb: vae
+    env_ldr: vae
+    env_log: vae
+    env_nrm: vae
+
+  additional_cond_labels: [env_ldr, env_log, env_nrm]
+
+  cond_dropout:
+    rgb: 0.1
+    env_ldr: 0.1
+    env_log: env_ldr
+    env_nrm: env_ldr
+  
+  cond_dropout_all: 0.05
+  cond_dropout_skip: env_nrm
+
+  transformer_kwargs:
+    additional_input_channels: null
+    additional_patch_embed_channels: 48 # 3 * 16
+    additional_output_channels: 32 # 2 * 16
+    use_learned_positional_embeddings: false
+    copy_weights: true
+    copy_temb_layer: true
+
+train_data:
+  # shared_params:
+  input_labels: 
+    - 'rgb'
+    - 'env_ldr'
+    - 'env_log'
+    - 'env_nrm'
+
+  datasets: null
+
+seed: 42
+resolution: 512
+
+mixed_precision: 'bf16'

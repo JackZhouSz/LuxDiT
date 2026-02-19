@@ -1,0 +1,257 @@
+output_dir: 'exp/luxdit_video_lora_example'
+
+pretrained_model_name_or_path: 'THUDM/CogVideoX-5b-I2V'
+revision: null
+
+# Uncomment this to use Deepspeed to save more GPU memory
+# use_deepspeed: true
+# deepspeed_config: configs/dist_config/zero_config/zero2.yaml
+
+find_unused_parameters: true # Please add this if you train partial modules
+
+lora_config:
+  r: 64 # lora rank
+  lora_alpha: 64
+  init_lora_weights: 'gaussian'
+  target_modules: ["to_k", "to_q", "to_v", "to_out.0", "ff.net.0.proj", "ff.net.2"]
+
+lora_only: true
+
+pretrained_transformer: 'checkpoints/luxdit_video'
+
+model_pipeline:
+  unet_path: 'THUDM/CogVideoX-5b-I2V'
+  vae_path: 'THUDM/CogVideoX-5b-I2V'
+  image_encoder_path: 'THUDM/CogVideoX-5b-I2V' # 1024
+
+  cond_mode: 'env' # clipimage for cross attention
+  target_image: ['rgb']
+  additional_target_image: ['env_ldr', 'env_log']
+  additional_rope_time_only: false
+
+  separate_timesteps: true
+  denoise_type: 'additional_hidden_states'
+
+  text_prompt: null
+
+  cond_images:
+    rgb: vae
+    env_ldr: vae
+    env_log: vae
+    env_nrm: vae
+
+  additional_cond_labels: [env_ldr, env_log, env_nrm]
+
+  cond_dropout:
+    rgb: 0.1
+    env_ldr: 0.1
+    env_log: env_ldr
+    env_nrm: env_ldr
+  
+  cond_dropout_all: 0.05
+  cond_dropout_skip: env_nrm
+
+  transformer_kwargs:
+    additional_input_channels: null
+    additional_patch_embed_channels: 48 # 3 * 16
+    additional_output_channels: 32 # 2 * 16
+    use_learned_positional_embeddings: false
+    copy_weights: true
+    copy_temb_layer: true
+
+num_train_examples: 40000 # just placeholder
+train_batch_size: 2
+dataloader_num_workers: 8
+
+train_data:
+  # shared_params:
+  batch_size: ${train_batch_size}
+  num_workers: 0
+  sample_n_frames: 25
+  shuffle_buffer_size: 64
+  n_nodes: 1
+  input_labels: 
+    - 'rgb'
+    - 'env_ldr'
+    - 'env_log'
+    - 'env_nrm'
+
+  datasets:
+    # 9 frames, 480x720, hdri
+    - target: src.data.env_rendering_dataset.LightningLoader
+      params:
+        batch_size: 1
+        num_workers: 2
+        data_config:
+          target: src.data.env_rgbxenv_dataset.RGBXEnvDataset
+          params:
+            sampling_weight: 2
+            hdri_list: prepare_data/data_list/dummy_hdri_list.txt
+            cam_theta_range: [-5, 10]
+            env_fov_range: [50, 80]
+            erp_random_cam: true
+            erp_random_roll: true
+            resolution: [480, 720]
+            env_resolution: [128, 256]
+            random_blur: 0.3
+            random_roughness: 0.3
+            random_autoexposure: 0.4
+            laval_tone: 0.3
+            random_tonemapping: true
+            num_frames: 9
+            vid_cam_mode: 'mixed'
+            vid_random_reverse: true
+            append_features:
+              lora_scale: 1
+
+    # 9 frames, 512x512, hdri
+    - target: src.data.env_rendering_dataset.LightningLoader
+      params:
+        batch_size: 1
+        num_workers: 2
+        data_config:
+          target: src.data.env_rgbxenv_dataset.RGBXEnvDataset
+          params:
+            sampling_weight: 2
+            hdri_list: prepare_data/data_list/dummy_hdri_list.txt
+            cam_theta_range: [-5, 10]
+            env_fov_range: [50, 80]
+            erp_random_cam: true
+            erp_random_roll: true
+            resolution: [512, 512]
+            env_resolution: [128, 256]
+            random_blur: 0.3
+            random_roughness: 0.3
+            random_autoexposure: 0.4
+            laval_tone: 0.3
+            random_tonemapping: true
+            num_frames: 9
+            vid_cam_mode: 'mixed'
+            vid_random_reverse: true
+            append_features:
+              lora_scale: 1
+
+    # 9 frames, 512x512, web360
+    - target: src.data.env_rendering_dataset.LightningLoader
+      params:
+        batch_size: 1
+        num_workers: 2
+        data_config:
+          target: src.data.env_panovideo_dataset.PanoVidDataset
+          params:
+            sampling_weight: 2
+            hdri_list: prepare_data/data_list/dummy_web360_list.txt
+            cam_theta_range: [-5, 10]
+            env_fov_range: [45, 75]
+            erp_random_cam: true
+            erp_random_roll: true
+            resolution: [512, 512]
+            env_resolution: [128, 256]
+            random_autoexposure: 1
+            # faster_laval_tone: true
+            num_frames: 9
+            sample_stride: 1
+            sample_stride_max: 5
+            vid_cam_mode: 'mixed'
+            vid_random_reverse: true
+            append_features:
+              lora_scale: 1
+              loss_mask: [1, 0]
+
+    # 9 frames, 480x720, web360
+    - target: src.data.env_rendering_dataset.LightningLoader
+      params:
+        batch_size: 1
+        num_workers: 2
+        data_config:
+          target: src.data.env_panovideo_dataset.PanoVidDataset
+          params:
+            sampling_weight: 2
+            hdri_list: prepare_data/data_list/dummy_web360_list.txt
+            cam_theta_range: [-5, 10]
+            env_fov_range: [45, 75]
+            erp_random_cam: true
+            erp_random_roll: true
+            resolution: [480, 720]
+            env_resolution: [128, 256]
+            random_autoexposure: 1
+            # faster_laval_tone: true
+            num_frames: 9
+            sample_stride: 1
+            sample_stride_max: 5
+            vid_cam_mode: 'mixed'
+            vid_random_reverse: true
+            append_features:
+              lora_scale: 1
+              loss_mask: [1, 0]
+
+seed: 42
+resolution: 512
+
+num_train_epochs: 100
+max_train_steps: 20000
+gradient_accumulation_steps: 1 # or 2?
+gradient_checkpointing: false
+
+learning_rate: 2.e-5
+scale_lr: false
+lr_scheduler: "constant_with_warmup"
+lr_warmup_steps: 0
+
+use_8bit_adam: false
+allow_tf32: true
+use_ema: false
+
+adam_beta1: 0.9
+adam_beta2: 0.999
+adam_weight_decay: 1.e-2
+adam_epsilon: 1.e-8
+max_grad_norm: 1.0
+
+logging_dir: 'logs'
+mixed_precision: 'bf16'
+report_to: 'tensorboard'
+local_rank: -1
+checkpointing_steps: 1000
+checkpoints_total_limit: 8
+resume_from_checkpoint: latest
+
+tracker_project_name: 'cogvideox-luxdit'
+
+inference_kwargs:
+- dataset_name: env_rgbxenv_hdri
+  num_inference_steps: 25
+  guidance_scale: 2.0
+  num_infer_per_image: 1
+  frames_per_sample: 9
+  lora_scale: 1
+  resolution: [480, 720]
+  env_resolution: [128, 256]
+  dataset_kwargs:
+    erp_random_cam: 0.8
+
+- dataset_name: env_panovideo_hdri
+  num_inference_steps: 25
+  guidance_scale: 2.0
+  num_infer_per_image: 1
+  frames_per_sample: 9
+  lora_scale: 1
+  resolution: [480, 720]
+  env_resolution: [128, 256]
+  dataset_kwargs:
+    sample_stride_max: 4
+    erp_random_cam: 0.5
+
+validation_data:
+  validation_images:
+  - [0, examples/hdri/rural_crossroads_2k.hdr]
+  - [1, examples/360vid/100746.mp4]
+
+validation_steps: 200
+
+job_stop_steps: 1000
+
+free_memory_every: 10
+
+# inference_only: true
+save_final_model: true

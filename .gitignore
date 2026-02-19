@@ -1,0 +1,11 @@
+examples/360vid_pers
+examples/hdri_pers_vid
+examples/hdri_pers_img
+examples/inthewild
+__pycache__/
+*.pyc
+test_output/
+test_rgbxenv/
+exp/
+.DS_Store
+gradio_temp/
