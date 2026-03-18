@@ -1,5 +1,6 @@
 import os
 import sys
+import glob
 import tempfile
 import shutil
 import time
@@ -29,15 +30,15 @@ _hdr_model_cache = None
 LOCAL_TEMP_DIR = os.path.join(os.path.dirname(__file__), "gradio_temp")
 os.makedirs(LOCAL_TEMP_DIR, exist_ok=True)
 
-def load_pipeline(model_type, config_path, transformer_path, lora_dir=None, precision="bf16"):
-    """Load and cache the pipeline"""
-    cache_key = f"{model_type}_{transformer_path}_{lora_dir}_{precision}"
+def load_pipeline(model_type, config_path, transformer_path, lora_dir=None):
+    """Load and cache the pipeline (always bf16)."""
+    cache_key = f"{model_type}_{transformer_path}_{lora_dir}"
     
     if cache_key in _pipeline_cache:
         return _pipeline_cache[cache_key]
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    weight_dtype = torch.bfloat16 if precision == "bf16" else torch.float16
+    weight_dtype = torch.bfloat16
     
     # Load config
     schema = OmegaConf.structured(TrainingConfig)
@@ -123,7 +124,6 @@ def process_image_inference(
     guidance_scale,
     num_inference_steps,
     seed,
-    precision,
     use_hdr_merger,
     hdr_model_path
 ):
@@ -148,7 +148,7 @@ def process_image_inference(
             
             # Load pipeline
             lora_dir_clean = lora_dir.strip() if lora_dir and lora_dir.strip() else None
-            pipeline, cfg = load_pipeline(model_type, config_path, transformer_path, lora_dir_clean, precision)
+            pipeline, cfg = load_pipeline(model_type, config_path, transformer_path, lora_dir_clean)
             
             pipeline_cfg = cfg.model_pipeline
             data_cfg = cfg.train_dataset if 'train_dataset' in cfg else cfg.train_data
@@ -301,7 +301,6 @@ def process_video_inference(
     guidance_scale,
     num_inference_steps,
     seed,
-    precision,
     frames_per_sample,
     use_hdr_merger,
     hdr_model_path
@@ -324,7 +323,7 @@ def process_video_inference(
             
             # Load pipeline
             lora_dir_clean = lora_dir.strip() if lora_dir and lora_dir.strip() else None
-            pipeline, cfg = load_pipeline(model_type, config_path, transformer_path, lora_dir_clean, precision)
+            pipeline, cfg = load_pipeline(model_type, config_path, transformer_path, lora_dir_clean)
             
             pipeline_cfg = cfg.model_pipeline
             data_cfg = cfg.train_dataset if 'train_dataset' in cfg else cfg.train_data
@@ -484,15 +483,60 @@ def process_video_inference(
         error_msg = f"Error: {str(e)}\n{traceback.format_exc()}"
         return None, None, None, error_msg
 
+def _example_path(rel_path):
+    """Resolve example path relative to this script."""
+    base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, rel_path)
+
+
+def _discover_examples():
+    """Discover existing image and video examples under examples/."""
+    base = os.path.dirname(os.path.abspath(__file__))
+    ex_root = os.path.join(base, "examples")
+    
+    def glob_sorted(*patterns):
+        out = []
+        for p in patterns:
+            path = os.path.join(ex_root, p)
+            for f in sorted(glob.glob(path)):
+                if os.path.isfile(f):
+                    out.append(f)
+        return out
+    
+    image_examples = []
+    # Synthetic images (no LoRA)
+    for f in glob_sorted("input_demo/synthetic_images/*.png", "input_demo/synthetic_images/*.jpg")[:2]:
+        image_examples.append((f, "base", "configs/luxdit_base.yaml", "checkpoints/luxdit_base",
+            "", 0.0, "480x720", 2.5, 50, 33, True, "checkpoints/hdr_merge_mlp"))
+    # Real scene images (with LoRA)
+    for f in glob_sorted("input_demo/scene_images/*.png", "input_demo/scene_images/*.jpg")[:3]:
+        image_examples.append((f, "base", "configs/luxdit_base.yaml", "checkpoints/luxdit_base",
+            "checkpoints/luxdit_base/lora", 0.8, "480x720", 2.5, 50, 33, True, "checkpoints/hdr_merge_mlp"))
+    
+    video_examples = []
+    # Synthetic videos
+    for f in glob_sorted("input_demo/synthetic_videos/*.mp4")[:2]:
+        video_examples.append((f, "video", "configs/luxdit_base.yaml", "checkpoints/luxdit_video",
+            "", 0.0, "480x720", 2.5, 40, 33, 25, True, "checkpoints/hdr_merge_mlp"))
+    # Real scene videos
+    for f in glob_sorted("input_demo/scene_videos/*.mp4", "360vid/*.mp4")[:2]:
+        video_examples.append((f, "video", "configs/luxdit_base.yaml", "checkpoints/luxdit_video",
+            "checkpoints/luxdit_video/lora", 0.8, "480x720", 2.5, 40, 33, 25, True, "checkpoints/hdr_merge_mlp"))
+    
+    return image_examples, video_examples
+
+
 def create_demo():
     """Create the Gradio interface"""
+    
+    image_examples_list, video_examples_list = _discover_examples()
     
     with gr.Blocks(title="LuxDiT: Lighting Estimation Demo") as demo:
         gr.Markdown("""
         # LuxDiT: Lighting Estimation with Video Diffusion Transformer
         
         This demo allows you to estimate high-quality HDR environment maps from images or videos.
-        Upload an image or video to get started!
+        Use the **Quick start** examples below to try with sample inputs, or upload your own.
         """)
         
         with gr.Tabs():
@@ -527,11 +571,6 @@ def create_demo():
                                 step=0.1,
                                 label="LoRA Scale"
                             )
-                            precision = gr.Radio(
-                                choices=["bf16", "fp16"],
-                                value="bf16",
-                                label="Precision"
-                            )
                         
                         with gr.Accordion("Inference Parameters", open=True):
                             resolution = gr.Dropdown(
@@ -561,7 +600,7 @@ def create_demo():
                         
                         with gr.Accordion("HDR Merger", open=False):
                             use_hdr_merger = gr.Checkbox(
-                                value=False,
+                                value=True,
                                 label="Enable HDR Merger"
                             )
                             hdr_model_path = gr.Textbox(
@@ -590,12 +629,33 @@ def create_demo():
                         guidance_scale,
                         num_inference_steps,
                         seed,
-                        precision,
                         use_hdr_merger,
                         hdr_model_path
                     ],
                     outputs=[ldr_output, log_output, hdr_output, status_output]
                 )
+                
+                # Quick-start examples from examples/ (synthetic + scene images)
+                if image_examples_list:
+                    gr.Examples(
+                        examples=[list(ex) for ex in image_examples_list],
+                        inputs=[
+                            image_input,
+                            model_type,
+                            config_path,
+                            transformer_path,
+                            lora_dir,
+                            lora_scale,
+                            resolution,
+                            guidance_scale,
+                            num_inference_steps,
+                            seed,
+                            use_hdr_merger,
+                            hdr_model_path,
+                        ],
+                        label="Quick start (click an example to load)",
+                        run_on_click=False,
+                    )
             
             with gr.Tab("Video Inference"):
                 with gr.Row():
@@ -627,11 +687,6 @@ def create_demo():
                                 value=0.8,
                                 step=0.1,
                                 label="LoRA Scale"
-                            )
-                            precision_video = gr.Radio(
-                                choices=["bf16", "fp16"],
-                                value="bf16",
-                                label="Precision"
                             )
                         
                         with gr.Accordion("Inference Parameters", open=True):
@@ -666,7 +721,7 @@ def create_demo():
                         
                         with gr.Accordion("HDR Merger", open=False):
                             use_hdr_merger_video = gr.Checkbox(
-                                value=False,
+                                value=True,
                                 label="Enable HDR Merger"
                             )
                             hdr_model_path_video = gr.Textbox(
@@ -694,13 +749,35 @@ def create_demo():
                         guidance_scale_video,
                         num_inference_steps_video,
                         seed_video,
-                        precision_video,
                         frames_per_sample,
                         use_hdr_merger_video,
                         hdr_model_path_video
                     ],
                     outputs=[video_output, hdr_output_video, status_output_video]
                 )
+                
+                # Quick-start examples from examples/ (synthetic + scene videos)
+                if video_examples_list:
+                    gr.Examples(
+                        examples=[list(ex) for ex in video_examples_list],
+                        inputs=[
+                            video_input,
+                            model_type_video,
+                            config_path_video,
+                            transformer_path_video,
+                            lora_dir_video,
+                            lora_scale_video,
+                            resolution_video,
+                            guidance_scale_video,
+                            num_inference_steps_video,
+                            seed_video,
+                            frames_per_sample,
+                            use_hdr_merger_video,
+                            hdr_model_path_video,
+                        ],
+                        label="Quick start (click an example to load)",
+                        run_on_click=False,
+                    )
         
         gr.Markdown("""
         ## Notes

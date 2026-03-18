@@ -1,0 +1,9 @@
+{
+  "_class_name": "HDR_MLP",
+  "_diffusers_version": "0.32.1",
+  "hidden_dim": 64,
+  "in_dim": 6,
+  "num_layers": 5,
+  "out_activation": "softplus",
+  "out_dim": 3
+}
