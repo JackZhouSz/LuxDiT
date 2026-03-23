@@ -1,4 +1,4 @@
-output_dir: 'checkpoints/luxdit_base'
+output_dir: 'checkpoints/luxdit_image'
 
 pretrained_model_name_or_path: 'THUDM/CogVideoX-5b-I2V'
 revision: null

@@ -4,7 +4,9 @@
 
 [Ruofan Liang](https://www.cs.toronto.edu/~ruofan/), [Kai He](https://www.cs.toronto.edu/~hekai/), [Zan Gojcic](https://zgojcic.github.io/), [Igor Gilitschenski](https://www.gilitschenski.org/igor/),  [Sanja Fidler](https://www.cs.toronto.edu/~fidler/), [Nandita Vijaykumar](https://www.cs.toronto.edu/~nandita/), [Zian Wang](https://www.cs.toronto.edu/~zianwang/)
 
-**[Paper](https://arxiv.org/abs/2509.03680) | [Project Page](https://research.nvidia.com/labs/toronto-ai/LuxDiT/)**
+[![Paper](https://img.shields.io/badge/Paper-arXiv%3A2509.03680-B31B1B?style=flat-square&logo=arxiv&logoColor=white)](https://arxiv.org/abs/2509.03680)
+[![Project Page](https://img.shields.io/badge/Project%20Page-LuxDiT-0A66C2?style=flat-square&logo=googlechrome&logoColor=white)](https://research.nvidia.com/labs/toronto-ai/LuxDiT/)
+[![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Model-FFB000?style=flat-square&logo=huggingface&logoColor=black)](https://huggingface.co/nvidia/LuxDiT)
 
 **Overview.**
 
@@ -30,19 +32,20 @@ pip install -r requirements.txt
 
 ## Model Weights
 
-The model weights are available on [Hugging Face]().
-We provide 2 checkpoints:
+The model weights are available on [Hugging Face](https://huggingface.co/nvidia/LuxDiT).
 
-| Checkpoints                                                                                                                | Description                                                           |
-| -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| [luxdit_base]()                     | Finetuned on image data, with LoRA adapter for real scenes                                               |
-| [luxdit_video]() | Finetuned on video data, with LoRA adapter for real scenes |
+| Model checkpoints | Description |
+| --- | --- |
+| `luxdit_image` | Image-finetuned checkpoint with LoRA adapter for real scenes |
+| `luxdit_video` | Video-finetuned checkpoint with LoRA adapter for real scenes |
+| `hdr_merge_mlp` | HDR merger used to produce `.exr` outputs from dual tonemapped predictions |
 
 You can download model weights by running the following command:
 
 ```bash
-python download_weights.py --repo_id xxx/luxdit_base
-python download_weights.py --repo_id xxx/luxdit_video
+# Download all ckpts all at once
+mkdir -p checkpoints
+hf download nvidia/LuxDiT --local-dir checkpoints
 ```
 
 
@@ -96,7 +99,7 @@ This corresponds to the in-domain data used for finetuning the base DiT model.
 Estimating lighting from *single images* of synthetic rendering:
 
 ```bash
-DIT_PATH=checkpoints/luxdit_base
+DIT_PATH=checkpoints/luxdit_image
 INPUT_DIR=examples/input_demo/synthetic_images
 OUTPUT_DIR=test_output/synthetic_images
 # Step 1: run dit to estimate dual-tone mapped envmap.
@@ -146,8 +149,8 @@ We introduce additional LoRA adapters to make LuxDiT better generalize to real s
 Estimating lighting from *single images* of real scenes:
 
 ```bash
-DIT_PATH=checkpoints/luxdit_base
-LORA_PATH=checkpoints/luxdit_base/lora
+DIT_PATH=checkpoints/luxdit_image
+LORA_PATH=checkpoints/luxdit_image/lora
 INPUT_DIR=examples/input_demo/scene_images
 OUTPUT_DIR=test_output/scene_images
 # Step 1: run dit to estimate dual-tone mapped envmap.
@@ -234,7 +237,7 @@ We provide limited support for LuxDiT finetuning with LoRA.
 
 --- 
 
-Training image LoRA on `luxdit_base`, 
+Training image LoRA on `luxdit_image`, 
 
 ```bash
 accelerate launch train_luxdit.py \

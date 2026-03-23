@@ -1,4 +1,4 @@
-output_dir: 'exp/luxdit_base_lora_example'
+output_dir: 'exp/luxdit_image_lora_example'
 
 pretrained_model_name_or_path: 'THUDM/CogVideoX-5b-I2V'
 revision: null
@@ -15,7 +15,7 @@ lora_config:
 
 lora_only: true
 
-pretrained_transformer: 'checkpoints/luxdit_base'
+pretrained_transformer: 'checkpoints/luxdit_image'
 
 model_pipeline:
   unet_path: 'THUDM/CogVideoX-5b-I2V'

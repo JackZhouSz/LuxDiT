@@ -506,12 +506,12 @@ def _discover_examples():
     image_examples = []
     # Synthetic images (no LoRA)
     for f in glob_sorted("input_demo/synthetic_images/*.png", "input_demo/synthetic_images/*.jpg")[:2]:
-        image_examples.append((f, "base", "configs/luxdit_base.yaml", "checkpoints/luxdit_base",
+        image_examples.append((f, "base", "configs/luxdit_base.yaml", "checkpoints/luxdit_image",
             "", 0.0, "480x720", 2.5, 50, 33, True, "checkpoints/hdr_merge_mlp"))
     # Real scene images (with LoRA)
     for f in glob_sorted("input_demo/scene_images/*.png", "input_demo/scene_images/*.jpg")[:3]:
-        image_examples.append((f, "base", "configs/luxdit_base.yaml", "checkpoints/luxdit_base",
-            "checkpoints/luxdit_base/lora", 0.8, "480x720", 2.5, 50, 33, True, "checkpoints/hdr_merge_mlp"))
+        image_examples.append((f, "base", "configs/luxdit_base.yaml", "checkpoints/luxdit_image",
+            "checkpoints/luxdit_image/lora", 0.8, "480x720", 2.5, 50, 33, True, "checkpoints/hdr_merge_mlp"))
     
     video_examples = []
     # Synthetic videos
@@ -556,13 +556,13 @@ def create_demo():
                                 label="Config Path"
                             )
                             transformer_path = gr.Textbox(
-                                value="checkpoints/luxdit_base",
+                                value="checkpoints/luxdit_image",
                                 label="Transformer Path"
                             )
                             lora_dir = gr.Textbox(
                                 value="",
                                 label="LoRA Directory (optional, for real scenes)",
-                                placeholder="Leave empty for synthetic scenes. Example: checkpoints/luxdit_base/lora"
+                                placeholder="Leave empty for synthetic scenes. Example: checkpoints/luxdit_image/lora"
                             )
                             lora_scale = gr.Slider(
                                 minimum=0.0,

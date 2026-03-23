@@ -9,3 +9,4 @@ test_rgbxenv/
 exp/
 .DS_Store
 gradio_temp/
+checkpoints*/
